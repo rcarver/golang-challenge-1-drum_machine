@@ -123,6 +123,9 @@ func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
 	// Decode steps.
 	var steps [16]byte
 	err = binary.Read(reader, binary.LittleEndian, &steps)
+	if err != nil {
+		return err
+	}
 	for i, step := range steps {
 		t.Steps[i] = step == 1
 	}
