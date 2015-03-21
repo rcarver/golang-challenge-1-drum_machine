@@ -13,18 +13,27 @@ import (
 // and returns a pointer to a parsed pattern which is the entry point to the
 // rest of the data.
 func DecodeFile(path string) (*Pattern, error) {
-	p := &Pattern{}
-
 	// Open the file.
 	fi, err := os.Open(path)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 	defer fi.Close()
 
+	// Decode the data.
+	return DecodePattern(fi)
+}
+
+// DecodePattern decodes the drum machine data accessed via reader.
+func DecodePattern(reader io.Reader) (*Pattern, error) {
+	p := &Pattern{}
+
+	// Buffer all reading.
+	buffer := bufio.NewReader(reader)
+
 	// Parse the file header.
-	header := header{}
-	trackBytes, err := decodeHeader(&header, fi)
+	var header sliceHeader
+	trackBytes, err := decodeSlice(&header, buffer)
 	if err != nil {
 		return p, err
 	}
@@ -34,15 +43,13 @@ func DecodeFile(path string) (*Pattern, error) {
 	p.Tempo = header.Tempo
 
 	// Read the rest of the file for tracks.
-	// NOTE: without a bufio.Reader we only get one track before EOF
-	trackReader := bufio.NewReader(io.LimitReader(fi, trackBytes))
+	trackReader := io.LimitReader(buffer, trackBytes)
 
 	// Parse the track data.
 	for {
 		t := Track{}
 		err := decodeTrack(&t, trackReader)
 		if err != nil {
-			fmt.Printf("ERR Reading Track: %s\n", err)
 			if err == io.EOF {
 				break
 			}
@@ -54,8 +61,8 @@ func DecodeFile(path string) (*Pattern, error) {
 	return p, nil
 }
 
-// header is the low level binary header.
-type header struct {
+// sliceHeader is the low level binary header for the entire slice.
+type sliceHeader struct {
 	Magic        [13]byte
 	FileSize     byte
 	VersionBytes [32]byte
@@ -63,18 +70,18 @@ type header struct {
 }
 
 // ValidMagic verifies if the file has the right kind of header.
-func (h header) ValidMagic() bool {
+func (h sliceHeader) ValidMagic() bool {
 	return string(h.Magic[0:6]) == "SPLICE"
 }
 
 // Version returns the file version string.
-func (h header) Version() string {
+func (h sliceHeader) Version() string {
 	return strings.Trim(string(h.VersionBytes[:]), "\x00")
 }
 
-// decodeHeader extracts binary from reader into the header. It returns the
+// decodeSlice extracts binary from reader into the header. It returns the
 // number of bytes remaining in the file for track data.
-func decodeHeader(h *header, reader io.Reader) (int64, error) {
+func decodeSlice(h *sliceHeader, reader io.Reader) (int64, error) {
 	// Read into the struct.
 	err := binary.Read(reader, binary.LittleEndian, h)
 	if err != nil {
@@ -92,41 +99,36 @@ func decodeHeader(h *header, reader io.Reader) (int64, error) {
 	return bytes, nil
 }
 
+// trackHeader is the low level binary header for each track.
+type trackHeader struct {
+	ID       uint32
+	NameSize byte
+}
+
 // decodeTrack extracts binary from the reader into the Track.
 func decodeTrack(t *Track, reader io.Reader) error {
-	buf := bufio.NewReader(reader)
+	var header trackHeader
 
-	// Set the ID
-	fmt.Printf("Reading ID\n")
-	err := binary.Read(reader, binary.LittleEndian, &t.ID)
+	// Decode header.
+	err := binary.Read(reader, binary.LittleEndian, &header)
 	if err != nil {
 		return err
 	}
+	t.ID = int(header.ID)
 
-	// Get the size of the Name.
-	fmt.Printf("Reading Size\n")
-	size, err := buf.ReadByte()
-	if err != nil {
-		return err
-	}
-
-	// Set the Name.
-	fmt.Printf("Reading Name\n")
-	name := make([]byte, size)
-	_, err = io.ReadFull(buf, name)
+	// Decode name.
+	name := make([]byte, header.NameSize)
+	_, err = io.ReadFull(reader, name)
 	if err != nil {
 		return err
 	}
 	t.Name = string(name)
 
-	// Set the Steps.
-	fmt.Printf("Reading Steps\n")
-	for i := 0; i < 16; i++ {
-		b, err := buf.ReadByte()
-		if err != nil {
-			return err
-		}
-		t.Steps[i] = b == 1
+	// Decode steps.
+	var steps [16]byte
+	err = binary.Read(reader, binary.LittleEndian, &steps)
+	for i, step := range steps {
+		t.Steps[i] = step == 1
 	}
 
 	return nil

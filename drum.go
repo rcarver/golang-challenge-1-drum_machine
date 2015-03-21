@@ -49,7 +49,7 @@ func (p Pattern) String() string {
 
 // Track is the pattern played by a single instrument within a Pattern.
 type Track struct {
-	ID    uint32
+	ID    int
 	Name  string
 	Steps [16]bool
 }
