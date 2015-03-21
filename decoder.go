@@ -31,93 +31,89 @@ func DecodePattern(reader io.Reader) (*Pattern, error) {
 	// Buffer all reading.
 	buffer := bufio.NewReader(reader)
 
-	// Parse the file header.
-	var header sliceHeader
-	trackBytes, err := decodeSlice(&header, buffer)
+	// Parse the overall slice into a Pattern.
+	sf := &sliceFormat{}
+	err := sf.DecodePattern(p, buffer)
 	if err != nil {
 		return p, err
 	}
 
-	// Set fields from the header.
-	p.Version = header.Version()
-	p.Tempo = header.Tempo
-
 	// Read the rest of the file for tracks.
-	trackReader := io.LimitReader(buffer, trackBytes)
+	trackReader := io.LimitReader(buffer, sf.TrackBytes())
 
-	// Parse the track data.
+	// Parse the tracks.
 	for {
-		t := Track{}
-		err := decodeTrack(&t, trackReader)
+		t := &Track{}
+		tf := &trackFormat{}
+		err := tf.DecodeTrack(t, trackReader)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return p, err
 		}
-		p.AddTrack(&t)
+		p.AddTrack(t)
 	}
 
 	return p, nil
 }
 
-// sliceHeader is the low level binary header for the entire slice.
-type sliceHeader struct {
+// sliceFormat is the low level binary format for the slice.
+type sliceFormat struct {
 	Magic        [13]byte
 	FileSize     byte
 	VersionBytes [32]byte
 	Tempo        float32
 }
 
-// ValidMagic verifies if the file has the right kind of header.
-func (h sliceHeader) ValidMagic() bool {
-	return string(h.Magic[0:6]) == "SPLICE"
-}
-
-// Version returns the file version string.
-func (h sliceHeader) Version() string {
-	return strings.Trim(string(h.VersionBytes[:]), "\x00")
-}
-
-// decodeSlice extracts binary from reader into the header. It returns the
-// number of bytes remaining in the file for track data.
-func decodeSlice(h *sliceHeader, reader io.Reader) (int64, error) {
+// DecodePattern reads binary from reader and applies it to the Pattern.
+func (sf *sliceFormat) DecodePattern(p *Pattern, reader io.Reader) error {
 	// Read into the struct.
-	err := binary.Read(reader, binary.LittleEndian, h)
+	err := binary.Read(reader, binary.LittleEndian, sf)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// Verify the magic header.
-	if !h.ValidMagic() {
-		return 0, fmt.Errorf("Magic header is wrong, got: %s", h.Magic)
+	if !sf.validMagic() {
+		return fmt.Errorf("Magic header is wrong, got: %s", sf.Magic)
 	}
 
-	// Calculate the remaining bytes after reading everything.
-	bytes := int64(h.FileSize) - int64(len(h.VersionBytes)) - 4 /* Tempo float 32 */
+	// Set fields from the header.
+	p.Version = strings.Trim(string(sf.VersionBytes[:]), "\x00")
+	p.Tempo = sf.Tempo
 
-	return bytes, nil
+	return nil
 }
 
-// trackHeader is the low level binary header for each track.
-type trackHeader struct {
+// TrackBytes returns the number of bytes remaining for track data.
+func (sf *sliceFormat) TrackBytes() int64 {
+	return int64(sf.FileSize) - int64(len(sf.VersionBytes)) - 4 /* Tempo float32 */
+}
+
+// validMagic verifies that the data has the right kind of header.
+func (sf sliceFormat) validMagic() bool {
+	return string(sf.Magic[0:6]) == "SPLICE"
+}
+
+// trackFormat is the low level binary format for each track.
+type trackFormat struct {
 	ID       uint32
 	NameSize byte
 }
 
-// decodeTrack extracts binary from the reader into the Track.
-func decodeTrack(t *Track, reader io.Reader) error {
-	var header trackHeader
+// DecodeTrack reads binary from reader and applies it to the Track.
+func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
 
 	// Decode header.
-	err := binary.Read(reader, binary.LittleEndian, &header)
+	err := binary.Read(reader, binary.LittleEndian, tf)
 	if err != nil {
 		return err
 	}
-	t.ID = int(header.ID)
+	t.ID = int(tf.ID)
 
 	// Decode name.
-	name := make([]byte, header.NameSize)
+	name := make([]byte, tf.NameSize)
 	_, err = io.ReadFull(reader, name)
 	if err != nil {
 		return err
