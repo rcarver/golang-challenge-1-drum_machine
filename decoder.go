@@ -22,12 +22,9 @@ func DecodeFile(path string) (*Pattern, error) {
 	}
 	defer fi.Close()
 
-	// Read from the file.
-	reader := bufio.NewReader(fi)
-
 	// Parse the file header.
 	header := header{}
-	trackBytes, err := decodeHeader(&header, reader)
+	trackBytes, err := decodeHeader(&header, fi)
 	if err != nil {
 		return p, err
 	}
@@ -37,13 +34,15 @@ func DecodeFile(path string) (*Pattern, error) {
 	p.Tempo = header.Tempo
 
 	// Read the rest of the file for tracks.
-	trackReader := bufio.NewReader(io.LimitReader(reader, trackBytes))
+	// NOTE: without a bufio.Reader we only get one track before EOF
+	trackReader := bufio.NewReader(io.LimitReader(fi, trackBytes))
 
 	// Parse the track data.
 	for {
 		t := Track{}
 		err := decodeTrack(&t, trackReader)
 		if err != nil {
+			fmt.Printf("ERR Reading Track: %s\n", err)
 			if err == io.EOF {
 				break
 			}
@@ -98,18 +97,21 @@ func decodeTrack(t *Track, reader io.Reader) error {
 	buf := bufio.NewReader(reader)
 
 	// Set the ID
-	err := binary.Read(buf, binary.LittleEndian, &t.ID)
+	fmt.Printf("Reading ID\n")
+	err := binary.Read(reader, binary.LittleEndian, &t.ID)
 	if err != nil {
 		return err
 	}
 
 	// Get the size of the Name.
+	fmt.Printf("Reading Size\n")
 	size, err := buf.ReadByte()
 	if err != nil {
 		return err
 	}
 
 	// Set the Name.
+	fmt.Printf("Reading Name\n")
 	name := make([]byte, size)
 	_, err = io.ReadFull(buf, name)
 	if err != nil {
@@ -118,6 +120,7 @@ func decodeTrack(t *Track, reader io.Reader) error {
 	t.Name = string(name)
 
 	// Set the Steps.
+	fmt.Printf("Reading Steps\n")
 	for i := 0; i < 16; i++ {
 		b, err := buf.ReadByte()
 		if err != nil {
