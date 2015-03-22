@@ -55,7 +55,9 @@ func DecodePattern(reader io.Reader) (*Pattern, error) {
 	return p, nil
 }
 
-// sliceFormat is the low level binary format for the slice.
+// sliceFormat is the low level binary format for the slice. After initializing
+// this struct, you can use it to read or write Pattern objects into their
+// binary format.
 type sliceFormat struct {
 	Magic        [13]byte
 	FileSize     byte
@@ -63,7 +65,7 @@ type sliceFormat struct {
 	Tempo        float32
 }
 
-// DecodePattern reads binary from reader and applies it to the Pattern.
+// DecodePattern reads binary data from reader and applies it to the Pattern.
 func (sf *sliceFormat) DecodePattern(p *Pattern, reader io.Reader) error {
 	// Read into the struct.
 	err := binary.Read(reader, binary.LittleEndian, sf)
@@ -83,8 +85,26 @@ func (sf *sliceFormat) DecodePattern(p *Pattern, reader io.Reader) error {
 	return nil
 }
 
-func (sf *sliceFormat) Encode(w io.Writer) error {
-	return binary.Write(w, binary.LittleEndian, sf)
+// EncodePattern takes data from the given pattern and stores it in this
+// object. Afterwards, you can use Write to output that data.
+func (sf *sliceFormat) EncodePattern(p *Pattern) error {
+	sf.Magic = [13]byte{'S', 'P', 'L', 'I', 'C', 'E'}
+
+	for i, c := range p.Version {
+		sf.VersionBytes[i] = byte(c)
+	}
+
+	sf.Tempo = p.Tempo
+
+	return nil
+}
+
+// Write outputs the binary slice format to the writer.
+func (sf *sliceFormat) Write(w io.Writer) error {
+	if err := binary.Write(w, binary.LittleEndian, sf); err != nil {
+		return err
+	}
+	return nil
 }
 
 // TrackBytes returns the number of bytes remaining for track data.
@@ -103,7 +123,9 @@ func (sf sliceFormat) validMagic() bool {
 	return string(sf.Magic[0:6]) == "SPLICE"
 }
 
-// trackFormat is the low level binary format for each track.
+// trackFormat is the low level binary format for each track.  After
+// initializing this struct, you can use it to read or write Track objects into
+// their binary format.
 type trackFormat struct {
 	trackHeader
 	Name  string
@@ -141,10 +163,34 @@ func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
 	return nil
 }
 
-func (tf *trackFormat) Encode(w io.Writer) error {
-	binary.Write(w, binary.LittleEndian, tf.trackHeader)
-	io.WriteString(w, tf.Name)
-	binary.Write(w, binary.LittleEndian, tf.steps)
+// EncodeTrack stores the given Track data in this object. Afterwards, you can
+// use Write to output that data.
+func (tf *trackFormat) EncodeTrack(t *Track) error {
+	tf.ID = uint32(t.ID)
+	tf.NameSize = byte(len(t.Name))
+	tf.Name = t.Name
+	for i, s := range t.Steps {
+		if s {
+			tf.steps[i] = 1
+		} else {
+			tf.steps[i] = 0
+		}
+
+	}
+	return nil
+}
+
+// Write outputs the binary track format to the writer.
+func (tf *trackFormat) Write(w io.Writer) error {
+	if err := binary.Write(w, binary.LittleEndian, tf.trackHeader); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w, tf.Name); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.LittleEndian, tf.steps); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -31,7 +31,7 @@ func EncodeToBytes(p *Pattern) ([]byte, error) {
 	sf := &sliceFormat{}
 
 	// Encode the slice header.
-	err := encodeSliceFormat(sf, p)
+	err := sf.EncodePattern(p)
 	if err != nil {
 		return buf.Bytes(), err
 	}
@@ -43,7 +43,7 @@ func EncodeToBytes(p *Pattern) ([]byte, error) {
 	// Encode each track.
 	for _, t := range p.Tracks {
 		tf := &trackFormat{}
-		err := encodeTrackFormat(tf, t)
+		err := tf.EncodeTrack(t)
 		if err != nil {
 			return buf.Bytes(), err
 		}
@@ -55,43 +55,16 @@ func EncodeToBytes(p *Pattern) ([]byte, error) {
 	sf.SetFileSize(trackBytes)
 
 	// Write the sliceFormat.
-	if err := sf.Encode(buf); err != nil {
+	if err := sf.Write(buf); err != nil {
 		return buf.Bytes(), err
 	}
 
 	// Write all trackFormat.
 	for _, tf := range tracks {
-		if err := tf.Encode(buf); err != nil {
+		if err := tf.Write(buf); err != nil {
 			return buf.Bytes(), err
 		}
 	}
 
 	return buf.Bytes(), nil
-}
-
-func encodeSliceFormat(sf *sliceFormat, p *Pattern) error {
-	sf.Magic = [13]byte{'S', 'P', 'L', 'I', 'C', 'E'}
-
-	for i, c := range p.Version {
-		sf.VersionBytes[i] = byte(c)
-	}
-
-	sf.Tempo = p.Tempo
-
-	return nil
-}
-
-func encodeTrackFormat(tf *trackFormat, t *Track) error {
-	tf.ID = uint32(t.ID)
-	tf.NameSize = byte(len(t.Name))
-	tf.Name = t.Name
-	for i, s := range t.Steps {
-		if s {
-			tf.steps[i] = 1
-		} else {
-			tf.steps[i] = 0
-		}
-
-	}
-	return nil
 }
