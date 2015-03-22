@@ -83,9 +83,19 @@ func (sf *sliceFormat) DecodePattern(p *Pattern, reader io.Reader) error {
 	return nil
 }
 
+func (sf *sliceFormat) Encode(w io.Writer) error {
+	return binary.Write(w, binary.LittleEndian, sf)
+}
+
 // TrackBytes returns the number of bytes remaining for track data.
 func (sf *sliceFormat) TrackBytes() int64 {
 	return int64(sf.FileSize) - int64(len(sf.VersionBytes)) - 4 /* Tempo float32 */
+}
+
+// SetFileSize updates the FileSize, accomodating for the current internal
+// data, plus the given trackBytes.
+func (sf *sliceFormat) SetFileSize(trackBytes int64) {
+	sf.FileSize = byte(trackBytes + int64(len(sf.VersionBytes)) + 4) /* Tempo float32 */
 }
 
 // validMagic verifies that the data has the right kind of header.
@@ -95,15 +105,16 @@ func (sf sliceFormat) validMagic() bool {
 
 // trackFormat is the low level binary format for each track.
 type trackFormat struct {
-	ID       uint32
-	NameSize byte
+	trackHeader
+	Name  string
+	steps [16]byte
 }
 
 // DecodeTrack reads binary from reader and applies it to the Track.
 func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
 
 	// Decode header.
-	err := binary.Read(reader, binary.LittleEndian, tf)
+	err := binary.Read(reader, binary.LittleEndian, &tf.trackHeader)
 	if err != nil {
 		return err
 	}
@@ -128,4 +139,24 @@ func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
 	}
 
 	return nil
+}
+
+func (tf *trackFormat) Encode(w io.Writer) error {
+	binary.Write(w, binary.LittleEndian, tf.trackHeader)
+	io.WriteString(w, tf.Name)
+	binary.Write(w, binary.LittleEndian, tf.steps)
+	return nil
+}
+
+// trackHeader is the low level binary format for the header of each track
+type trackHeader struct {
+	ID       uint32
+	NameSize byte
+}
+
+// ByteSize is the total size of the track data.
+func (th *trackHeader) ByteSize() int64 {
+	// ID + NameSize + len(Name) + 16 steps
+	return int64(4 + 1 + th.NameSize + 16)
+
 }
