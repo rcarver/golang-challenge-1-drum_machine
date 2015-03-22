@@ -39,17 +39,14 @@ func DecodePattern(reader io.Reader) (*Pattern, error) {
 	}
 
 	// Read the rest of the file for tracks.
-	trackReader := io.LimitReader(buffer, sf.TrackBytes())
+	trackReader := io.LimitReader(buffer, sf.TrackBytes()).(*io.LimitedReader)
 
 	// Parse the tracks.
-	for {
+	for trackReader.N > 0 {
 		t := &Track{}
 		tf := &trackFormat{}
 		err := tf.DecodeTrack(t, trackReader)
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			return p, err
 		}
 		p.AddTrack(t)
