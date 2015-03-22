@@ -2,25 +2,18 @@ package drum
 
 import (
 	"bytes"
-	"os"
+	"io/ioutil"
 )
 
 func EncodeToFile(path string, p *Pattern) error {
-
-	fo, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer fo.Close()
-
 	bytes, err := EncodeToBytes(p)
 	if err != nil {
 		return err
 	}
-	if _, err := fo.Write(bytes); err != nil {
+	// TODO: use os.FileMode?
+	if err := ioutil.WriteFile(path, bytes, 0x755); err != nil {
 		return err
 	}
-
 	return nil
 }
 
