@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 )
 
+// EncodeToFile takes Pattern p and writes it to path.
 func EncodeToFile(path string, p *Pattern) error {
 	bytes, err := EncodeToBytes(p)
 	if err != nil {
@@ -17,6 +18,7 @@ func EncodeToFile(path string, p *Pattern) error {
 	return nil
 }
 
+// EncodeToBytes takes Pattern p and returns its binary representation.
 func EncodeToBytes(p *Pattern) ([]byte, error) {
 	buf := new(bytes.Buffer)
 
