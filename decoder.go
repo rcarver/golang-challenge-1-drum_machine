@@ -23,20 +23,18 @@ func DecodeFile(path string) (*Pattern, error) {
 
 // DecodePattern decodes the drum machine data accessed via reader.
 func DecodePattern(reader io.Reader) (*Pattern, error) {
-	p := &Pattern{}
-
-	// Buffer all reading.
-	buffer := bufio.NewReader(reader)
+	buf := bufio.NewReader(reader)
 
 	// Parse the overall slice into a Pattern.
+	p := &Pattern{}
 	sf := &sliceFormat{}
-	err := sf.DecodePattern(p, buffer)
+	err := sf.DecodePattern(p, buf)
 	if err != nil {
 		return p, err
 	}
 
 	// Read the rest of the file for tracks.
-	trackReader := io.LimitReader(buffer, sf.TrackBytes()).(*io.LimitedReader)
+	trackReader := io.LimitReader(buf, sf.TrackBytes()).(*io.LimitedReader)
 
 	// Parse the tracks.
 	for trackReader.N > 0 {

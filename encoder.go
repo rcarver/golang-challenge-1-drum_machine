@@ -20,12 +20,10 @@ func EncodeToFile(path string, p *Pattern) error {
 
 // EncodeToBytes takes Pattern p and returns its binary representation.
 func EncodeToBytes(p *Pattern) ([]byte, error) {
-	buf := new(bytes.Buffer)
-
-	// Initialize empty sliceFormat
-	sf := &sliceFormat{}
+	buf := &bytes.Buffer{}
 
 	// Encode the slice header.
+	sf := &sliceFormat{}
 	err := sf.EncodePattern(p)
 	if err != nil {
 		return buf.Bytes(), err
