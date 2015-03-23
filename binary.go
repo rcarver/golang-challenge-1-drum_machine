@@ -37,6 +37,11 @@ func (sf *sliceFormat) DecodePattern(p *Pattern, reader io.Reader) error {
 	return nil
 }
 
+// TrackBytes returns the number of bytes remaining for track data.
+func (sf *sliceFormat) TrackBytes() int64 {
+	return int64(sf.FileSize) - int64(len(sf.VersionBytes)) - 4 /* Tempo float32 */
+}
+
 // EncodePattern takes data from the given pattern and stores it in this
 // object. Afterwards, you can use Write to output that data.
 func (sf *sliceFormat) EncodePattern(p *Pattern) error {
@@ -51,23 +56,19 @@ func (sf *sliceFormat) EncodePattern(p *Pattern) error {
 	return nil
 }
 
+// SetFileSize updates the FileSize, accomodating for the current internal
+// data, plus the given trackBytes. Call this after calculating how much track
+// data is available, and before calling Write.
+func (sf *sliceFormat) SetFileSize(trackBytes int64) {
+	sf.FileSize = byte(trackBytes + int64(len(sf.VersionBytes)) + 4) /* Tempo float32 */
+}
+
 // Write outputs the binary slice format to the writer.
 func (sf *sliceFormat) Write(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, sf); err != nil {
 		return err
 	}
 	return nil
-}
-
-// TrackBytes returns the number of bytes remaining for track data.
-func (sf *sliceFormat) TrackBytes() int64 {
-	return int64(sf.FileSize) - int64(len(sf.VersionBytes)) - 4 /* Tempo float32 */
-}
-
-// SetFileSize updates the FileSize, accomodating for the current internal
-// data, plus the given trackBytes.
-func (sf *sliceFormat) SetFileSize(trackBytes int64) {
-	sf.FileSize = byte(trackBytes + int64(len(sf.VersionBytes)) + 4) /* Tempo float32 */
 }
 
 // validMagic verifies that the data has the right kind of header.
