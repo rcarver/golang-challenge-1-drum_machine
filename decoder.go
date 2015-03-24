@@ -26,9 +26,8 @@ func DecodePattern(reader io.Reader) (*Pattern, error) {
 	buf := bufio.NewReader(reader)
 
 	// Parse the overall slice into a Pattern.
-	p := &Pattern{}
 	sf := &sliceFormat{}
-	err := sf.DecodePattern(p, buf)
+	p, err := sf.DecodePattern(buf)
 	if err != nil {
 		return p, err
 	}
@@ -38,9 +37,8 @@ func DecodePattern(reader io.Reader) (*Pattern, error) {
 
 	// Parse the tracks.
 	for trackReader.N > 0 {
-		t := &Track{}
 		tf := &trackFormat{}
-		err := tf.DecodeTrack(t, trackReader)
+		t, err := tf.DecodeTrack(trackReader)
 		if err != nil {
 			return p, err
 		}

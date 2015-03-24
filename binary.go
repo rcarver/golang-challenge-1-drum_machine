@@ -17,24 +17,26 @@ type sliceFormat struct {
 	Tempo        float32
 }
 
-// DecodePattern reads binary data from reader and applies it to the Pattern.
-func (sf *sliceFormat) DecodePattern(p *Pattern, reader io.Reader) error {
+// DecodePattern reads binary data from reader and returns a Pattern.
+func (sf *sliceFormat) DecodePattern(reader io.Reader) (*Pattern, error) {
+	p := &Pattern{}
+
 	// Read into the struct.
 	err := binary.Read(reader, binary.LittleEndian, sf)
 	if err != nil {
-		return err
+		return p, err
 	}
 
 	// Verify the magic header.
 	if !sf.validMagic() {
-		return fmt.Errorf("Magic header is wrong, got: %s", sf.Magic)
+		return p, fmt.Errorf("Magic header is wrong, got: %s", sf.Magic)
 	}
 
 	// Set fields from the header.
 	p.Version = strings.Trim(string(sf.VersionBytes[:]), "\x00")
 	p.Tempo = sf.Tempo
 
-	return nil
+	return p, nil
 }
 
 // TrackBytes returns the number of bytes remaining for track data.
@@ -85,13 +87,14 @@ type trackFormat struct {
 	steps [16]byte
 }
 
-// DecodeTrack reads binary from reader and applies it to the Track.
-func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
+// DecodeTrack reads binary from reader and returns a Track.
+func (tf *trackFormat) DecodeTrack(reader io.Reader) (*Track, error) {
+	t := &Track{}
 
 	// Decode header.
 	err := binary.Read(reader, binary.LittleEndian, &tf.trackHeader)
 	if err != nil {
-		return err
+		return t, err
 	}
 	t.ID = int(tf.ID)
 
@@ -99,7 +102,7 @@ func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
 	name := make([]byte, tf.NameSize)
 	_, err = io.ReadFull(reader, name)
 	if err != nil {
-		return err
+		return t, err
 	}
 	t.Name = string(name)
 
@@ -107,13 +110,13 @@ func (tf *trackFormat) DecodeTrack(t *Track, reader io.Reader) error {
 	var steps [16]byte
 	err = binary.Read(reader, binary.LittleEndian, &steps)
 	if err != nil {
-		return err
+		return t, err
 	}
 	for i, step := range steps {
 		t.Steps[i] = step == 1
 	}
 
-	return nil
+	return t, nil
 }
 
 // EncodeTrack stores the given Track data in this object. Afterwards, you can
