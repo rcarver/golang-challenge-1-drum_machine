@@ -39,13 +39,16 @@ func (sf *sliceFormat) DecodePattern(reader io.Reader) (*Pattern, error) {
 	return p, nil
 }
 
-// TrackBytes returns the number of bytes remaining for track data.
-func (sf *sliceFormat) TrackBytes() int64 {
+// TrackBytes returns the number of bytes available for track data. This is
+// different than the FileSize field which is the size of everything except the
+// magic.
+func (sf *sliceFormat) TracksByteSize() int64 {
 	return int64(sf.FileSize) - int64(len(sf.VersionBytes)) - 4 /* Tempo float32 */
 }
 
 // EncodePattern takes data from the given pattern and stores it in this
-// object. Afterwards, you can use Write to output that data.
+// object. Afterwards, you can use Write to output that data, but see
+// SetFileSize.
 func (sf *sliceFormat) EncodePattern(p *Pattern) error {
 	sf.Magic = [13]byte{'S', 'P', 'L', 'I', 'C', 'E'}
 

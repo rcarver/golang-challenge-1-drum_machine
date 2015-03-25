@@ -10,14 +10,11 @@ import (
 // and returns a pointer to a parsed pattern which is the entry point to the
 // rest of the data.
 func DecodeFile(path string) (*Pattern, error) {
-	// Open the file.
 	fi, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer fi.Close()
-
-	// Decode the data.
 	return DecodePattern(fi)
 }
 
@@ -33,7 +30,7 @@ func DecodePattern(reader io.Reader) (*Pattern, error) {
 	}
 
 	// Read the rest of the file for tracks.
-	trackReader := io.LimitReader(buf, sf.TrackBytes()).(*io.LimitedReader)
+	trackReader := io.LimitReader(buf, sf.TracksByteSize()).(*io.LimitedReader)
 
 	// Parse the tracks.
 	for trackReader.N > 0 {
